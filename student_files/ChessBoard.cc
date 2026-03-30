@@ -107,11 +107,86 @@ bool ChessBoard::isValidMove(int fromRow, int fromColumn, int toRow, int toColum
 
 bool ChessBoard::movePiece(int fromRow, int fromColumn, int toRow, int toColumn)
 {
-    return false;
+    if (fromRow < 0 || fromRow >= numRows || fromColumn < 0 || fromColumn >= numCols)
+    {
+        return false;
+    }
+    if (toRow < 0 || toRow >= numRows || toColumn < 0 || toColumn >= numCols)
+    {
+        return false;
+    }
+
+    ChessPiece *movingPiece = board.at(fromRow).at(fromColumn);
+    if (movingPiece == nullptr)
+    {
+        return false;
+    }
+    if (movingPiece->getColor() != turn)
+    {
+        return false;
+    }
+    if (!isValidMove(fromRow, fromColumn, toRow, toColumn))
+    {
+        return false;
+    }
+    ChessPiece *cP = board.at(toRow).at(toColumn);
+    if (cP != nullptr)
+    {
+        delete cP;
+        board.at(toRow).at(toColumn) = nullptr;
+    }
+
+    board.at(toRow).at(toColumn) = movingPiece;
+    board.at(fromRow).at(fromColumn) = nullptr;
+    movingPiece->setPosition(toRow, toColumn);
+    if (turn == White)
+    {
+        turn = Black;
+    }
+    else
+    {
+        turn = White;
+    }
+
+    return true;
 }
 
 bool ChessBoard::isPieceUnderThreat(int row, int column)
 {
+    if (row < 0 || row >= numRows || column < 0 || column >= numCols)
+    {
+        return false;
+    }
+
+    ChessPiece *tP = board.at(row).at(column);
+    if (tP == nullptr)
+    {
+        return false;
+    }
+
+    Color tC = tP->getColor();
+    for (int r = 0; r < numRows; r++)
+    {
+        for (int c = 0; c < numCols; c++)
+        {
+            ChessPiece *attack = board.at(r).at(c);
+            if (attack == nullptr)
+            {
+                continue;
+            }
+
+            if (attack->getColor() == tC)
+            {
+                continue;
+            }
+
+            if (isValidMove(r, c, row, column))
+            {
+                return true;
+            }
+        }
+    }
+
     return false;
 }
 
