@@ -107,30 +107,46 @@ bool ChessBoard::isValidMove(int fromRow, int fromColumn, int toRow, int toColum
         return false;
     }
 
-    //Check detection: King cannot move to a square where it would be in check
-    if (piece->getType() == King && !checkingForCheck)
+    //Part 3: check constraint — no move is valid if it leaves own King in check
+    Color movingColor = piece->getColor();
+
+    //Simulate the move
+    ChessPiece *captured = board.at(toRow).at(toColumn);
+    board.at(toRow).at(toColumn) = piece;
+    board.at(fromRow).at(fromColumn) = nullptr;
+    piece->setPosition(toRow, toColumn);
+
+    //Find own King's position on the board after the simulated move
+    int kingRow = -1;
+    int kingCol = -1;
+    for (int r = 0; r < numRows; r++)
     {
-        checkingForCheck = true;
-
-        //Simulate the move
-        ChessPiece *captured = board.at(toRow).at(toColumn);
-        board.at(toRow).at(toColumn) = piece;
-        board.at(fromRow).at(fromColumn) = nullptr;
-        piece->setPosition(toRow, toColumn);
-
-        bool inCheck = isPieceUnderThreat(toRow, toColumn);
-
-        //Restore the board
-        board.at(fromRow).at(fromColumn) = piece;
-        board.at(toRow).at(toColumn) = captured;
-        piece->setPosition(fromRow, fromColumn);
-
-        checkingForCheck = false;
-
-        if (inCheck)
+        for (int c = 0; c < numCols; c++)
         {
-            return false;
+            ChessPiece *p = board.at(r).at(c);
+            if (p != nullptr && p->getColor() == movingColor && p->getType() == King)
+            {
+                kingRow = r;
+                kingCol = c;
+            }
         }
+    }
+
+    //Check if own King is under threat using raw attack rules
+    bool inCheck = false;
+    if (kingRow != -1)
+    {
+        inCheck = isPieceUnderThreat(kingRow, kingCol);
+    }
+
+    //Undo the simulation
+    board.at(fromRow).at(fromColumn) = piece;
+    board.at(toRow).at(toColumn) = captured;
+    piece->setPosition(fromRow, fromColumn);
+
+    if (inCheck)
+    {
+        return false;
     }
 
     return true;
@@ -211,7 +227,7 @@ bool ChessBoard::isPieceUnderThreat(int row, int column)
                 continue;
             }
 
-            if (isValidMove(r, c, row, column))
+            if (attack->canMoveToLocation(row, column))
             {
                 return true;
             }
