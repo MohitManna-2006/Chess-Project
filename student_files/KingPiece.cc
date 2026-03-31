@@ -1,5 +1,6 @@
 #include "KingPiece.hh"
 #include "ChessBoard.hh"
+#include <cstdlib>
 
 using Student::KingPiece;
 
@@ -23,6 +24,33 @@ const char *KingPiece::toString()
 
 bool KingPiece::canMoveToLocation(int toRow, int toColumn)
 {
-    // Stub for Part 1
-    return false;
+    // Bounds check
+    if (toRow < 0 || toRow >= board.getNumRows() ||
+        toColumn < 0 || toColumn >= board.getNumCols())
+    {
+        return false;
+    }
+
+    // Same position check
+    if (toRow == row && toColumn == column)
+    {
+        return false;
+    }
+
+    // Cannot capture own piece
+    ChessPiece *dest = board.getPiece(toRow, toColumn);
+    if (dest != nullptr && dest->getColor() == color)
+    {
+        return false;
+    }
+
+    // Must move exactly 1 square in any direction
+    int rowDiff = std::abs(toRow - row);
+    int colDiff = std::abs(toColumn - column);
+    if (rowDiff > 1 || colDiff > 1)
+    {
+        return false;
+    }
+
+    return true;
 }

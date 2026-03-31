@@ -15,6 +15,7 @@ namespace Student
         int numRows = 0;
         int numCols = 0;
         Color turn = White;
+        bool checkingForCheck = false;
         /**
          * @brief
          * A 2D vector of pointers to ChessPiece objects.
