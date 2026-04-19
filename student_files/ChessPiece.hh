@@ -15,6 +15,7 @@
     int row;
     int column;
     Type type;
+    bool hasMoved = false;
 
   public:
     /**
@@ -73,6 +74,9 @@
      * The new column number of the piece.
      */
     virtual void setPosition(int row, int column);
+
+    bool getHasMoved() { return hasMoved; }
+    void setHasMoved() { hasMoved = true; }
 
     /**
      * @brief

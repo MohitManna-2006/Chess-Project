@@ -3,6 +3,8 @@
 
 #include "ChessPiece.hh"
 #include "KingPiece.hh"
+#include "KnightPiece.hh"
+#include "QueenPiece.hh"
 #include <list>
 #include <vector>
 #include <sstream>
@@ -15,14 +17,17 @@ namespace Student
         int numRows = 0;
         int numCols = 0;
         Color turn = White;
-        /**
-         * @brief
-         * A 2D vector of pointers to ChessPiece objects.
-         * board.at(row) returns the entire row.
-         * board.at(row).at(col) returns a pointer to a ChessPiece object.
-         * *(board.at(row).at(col)) returns the ChessPiece object itself.
-         */
         std::vector<std::vector<ChessPiece *>> board;
+        // En passant state: square the capturing pawn moves TO, and position of the capturable pawn
+        int enPassantTargetRow = -1;
+        int enPassantTargetCol = -1;
+        int enPassantPawnRow = -1;
+        int enPassantPawnCol = -1;
+
+        // Returns true if any piece of byColor can move to (row,col)
+        bool isSquareUnderAttack(int row, int col, Color byColor);
+        // Returns true if a king at (fromRow,fromCol) moving to (toRow,toCol) is a legal castle
+        bool isCastlingValid(int fromRow, int fromCol, int toRow, int toCol);
 
     public:
         /**
@@ -65,6 +70,11 @@ namespace Student
          * Pointer to a piece.
          */
         ChessPiece *getPiece(int r, int c) { return board.at(r).at(c); }
+
+        int getEnPassantTargetRow() { return enPassantTargetRow; }
+        int getEnPassantTargetCol() { return enPassantTargetCol; }
+        int getEnPassantPawnRow()   { return enPassantPawnRow; }
+        int getEnPassantPawnCol()   { return enPassantPawnCol; }
 
         /**
          * @brief
@@ -141,6 +151,20 @@ namespace Student
          * An output stream containing the full board layout.
          */
         std::ostringstream displayBoard();
+
+        /**
+         * @brief Computes score from the perspective of the current player (turn).
+         * Score = (own piece value + 0.1 * own legal moves)
+         *       - (opponent piece value + 0.1 * opponent legal moves)
+         * Piece values: King=200, Queen=9, Rook=5, Knight/Bishop=3, Pawn=1.
+         */
+        float scoreBoard();
+
+        /**
+         * @brief Returns the highest score the current player can achieve
+         * after making a single legal move, from the current player's perspective.
+         */
+        float getHighestNextScore();
     };
 }
 

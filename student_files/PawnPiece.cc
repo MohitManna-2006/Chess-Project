@@ -89,14 +89,20 @@ bool PawnPiece::canMoveToLocation(int toRow, int toColumn)
         return true;
     }
 
-    //Case 3: Diagonal capture
+    //Case 3: Diagonal capture (including en passant)
     if (toRow == row + direction)
     {
         if (toColumn == column + 1 || toColumn == column - 1)
         {
-            //Check that there is an opponent piece at the destination
             ChessPiece *destPiece = board.getPiece(toRow, toColumn);
             if (destPiece != nullptr && destPiece->getColor() != color)
+            {
+                return true;
+            }
+            // En passant: destination is empty but matches the en passant target square
+            if (destPiece == nullptr &&
+                toRow == board.getEnPassantTargetRow() &&
+                toColumn == board.getEnPassantTargetCol())
             {
                 return true;
             }
