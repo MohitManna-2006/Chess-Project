@@ -1,156 +1,115 @@
-#include <assert.h>
-#include <cmath>
 #include <iostream>
+#include <string>
+#include <cstdio>
 #include "Chess.h"
 #include "ChessBoard.hh"
 #include "ChessPiece.hh"
 
-static bool approx(float a, float b) { return std::fabs(a - b) < 0.001f; }
-
-// ── scoreBoard() Tests ────────────────────────────────────────────────────────
-
-// Symmetric board: white king vs black king, both at corners far apart.
-// Each king has 3 moves from its corner, so score = (200+0.3)-(200+0.3) = 0.
-void test_score_symmetric()
+static void setupStandardBoard(Student::ChessBoard &b)
 {
-    Student::ChessBoard b(8, 8);
-    b.createChessPiece(White, King, 0, 0);
-    b.createChessPiece(Black, King, 7, 7);
+    // Black back rank (row 0)
+    b.createChessPiece(Black, Rook,   0, 0);
+    b.createChessPiece(Black, Knight, 0, 1);
+    b.createChessPiece(Black, Bishop, 0, 2);
+    b.createChessPiece(Black, Queen,  0, 3);
+    b.createChessPiece(Black, King,   0, 4);
+    b.createChessPiece(Black, Bishop, 0, 5);
+    b.createChessPiece(Black, Knight, 0, 6);
+    b.createChessPiece(Black, Rook,   0, 7);
+    for (int c = 0; c < 8; c++)
+        b.createChessPiece(Black, Pawn, 1, c);
 
-    float score = b.scoreBoard(); // white's turn
-    assert(approx(score, 0.0f) && "Symmetric board should score 0");
-    std::cout << "PASS: test_score_symmetric (score=" << score << ")\n";
+    // White back rank (row 7)
+    for (int c = 0; c < 8; c++)
+        b.createChessPiece(White, Pawn, 6, c);
+    b.createChessPiece(White, Rook,   7, 0);
+    b.createChessPiece(White, Knight, 7, 1);
+    b.createChessPiece(White, Bishop, 7, 2);
+    b.createChessPiece(White, Queen,  7, 3);
+    b.createChessPiece(White, King,   7, 4);
+    b.createChessPiece(White, Bishop, 7, 5);
+    b.createChessPiece(White, Knight, 7, 6);
+    b.createChessPiece(White, Rook,   7, 7);
 }
 
-// White has a queen (9), black has a pawn (1). White's turn.
-// White queen at (4,4): can reach 27 squares on empty 8x8.
-// Black pawn at (0,0) starting row=1 but placed at row 0, can't move forward (off board).
-// Actually place black pawn at (1,7) so it can move 1 or 2 steps.
-// Let's compute exactly:
-//   White queen at (4,4) on 8x8: 27 reachable squares.
-//   But black pawn at (1,7) is in the way on one diagonal.
-//   This is complex — let's use a simpler setup: just material gap.
-void test_score_material_advantage()
+static bool isInCheck(Student::ChessBoard &b, Color color)
 {
-    Student::ChessBoard b(8, 8);
-    // White: rook (5 pts)   Black: pawn (1 pt)
-    // No kings — just check the material math (moves will be whatever the engine says)
-    b.createChessPiece(White, Rook, 4, 0);
-    b.createChessPiece(Black, Pawn, 1, 7);
-
-    float score = b.scoreBoard();
-    // White has 5 pts, black has 1 pt, white leads on material.
-    // White rook moves + 0.1 - black pawn moves * 0.1 can be anything,
-    // but material alone is +4. Score should be positive.
-    assert(score > 0.0f && "White material advantage should give positive score");
-    std::cout << "PASS: test_score_material_advantage (score=" << score << ")\n";
+    for (int r = 0; r < b.getNumRows(); r++)
+        for (int c = 0; c < b.getNumCols(); c++) {
+            Student::ChessPiece *p = b.getPiece(r, c);
+            if (p && p->getColor() == color && p->getType() == King)
+                return b.isPieceUnderThreat(r, c);
+        }
+    return false;
 }
 
-// White lone rook on empty board: exact move count.
-// Rook at (0,0) on 8x8: 7 right + 7 down = 14 moves.
-// Black has nothing, so:
-//   score = (5 + 0.1*14) - (0 + 0) = 5 + 1.4 = 6.4
-void test_score_rook_only()
+static bool hasAnyLegalMove(Student::ChessBoard &b, Color color)
 {
-    Student::ChessBoard b(8, 8);
-    b.createChessPiece(White, Rook, 0, 0);
-
-    float score = b.scoreBoard();
-    assert(approx(score, 6.4f) && "Lone rook at (0,0): 5 + 14*0.1 = 6.4");
-    std::cout << "PASS: test_score_rook_only (score=" << score << ")\n";
-}
-
-// Two equal rooks, one per side, same position on opposite rows.
-// White rook at (0,4), Black rook at (7,4).
-// White rook: 7 horizontal + 6 vertical (blocked by black rook at (7,4))...
-// Actually (0,4): 4 left + 3 right = 7 horizontal. Vertical: rows 1-7 = 7, but black rook
-// at (7,4) is capturable so all 7 rows below are reachable (stops at capture) = 7 squares.
-// Total white rook moves: 7 + 7 = 14.
-// Same for black rook (symmetric).
-// score = (5 + 1.4) - (5 + 1.4) = 0.
-void test_score_equal_rooks()
-{
-    Student::ChessBoard b(8, 8);
-    b.createChessPiece(White, Rook, 0, 4);
-    b.createChessPiece(Black, Rook, 7, 4);
-
-    float score = b.scoreBoard();
-    assert(approx(score, 0.0f) && "Equal rooks facing each other: score = 0");
-    std::cout << "PASS: test_score_equal_rooks (score=" << score << ")\n";
-}
-
-// ── getHighestNextScore() Tests ───────────────────────────────────────────────
-
-// White rook at (0,0) can capture black queen at (0,7) in one move.
-// That's clearly the best move: removes 9-pt queen, gains mobility on that rank.
-// After capture: white rook at (0,7), no black pieces.
-//   score = 5 + 0.1*(7+7) - 0 = 5 + 1.4 = 6.4
-// Compare to doing nothing (no capture) — we expect best >= 6.4.
-void test_highest_captures_queen()
-{
-    Student::ChessBoard b(8, 8);
-    b.createChessPiece(White, Rook, 0, 0);
-    b.createChessPiece(Black, Queen, 0, 7); // on same rank, capturable
-
-    float best = b.getHighestNextScore();
-    // After capturing black queen, score = 5 + 0.1*14 = 6.4 (rook at corner, 14 moves)
-    assert(approx(best, 6.4f) && "Best move: capture queen, score should be 6.4");
-    std::cout << "PASS: test_highest_captures_queen (best=" << best << ")\n";
-}
-
-// getHighestNextScore > scoreBoard when a capture improves the position
-void test_highest_better_than_current()
-{
-    Student::ChessBoard b(8, 8);
-    b.createChessPiece(White, Rook, 4, 0);
-    b.createChessPiece(Black, Rook, 4, 7); // same row, white can capture
-
-    float current = b.scoreBoard();
-    float best    = b.getHighestNextScore();
-    assert(best > current && "Capturing opponent rook should raise score above current");
-    std::cout << "PASS: test_highest_better_than_current (current=" << current
-              << ", best=" << best << ")\n";
-}
-
-// Board state must be unchanged after getHighestNextScore()
-void test_highest_does_not_mutate_board()
-{
-    Student::ChessBoard b(8, 8);
-    b.createChessPiece(White, Rook,  4, 0);
-    b.createChessPiece(Black, Queen, 4, 7);
-
-    b.getHighestNextScore(); // should not permanently change the board
-
-    assert(b.getPiece(4, 0) != nullptr && b.getPiece(4, 0)->getType() == Rook  && "Rook should still be at (4,0)");
-    assert(b.getPiece(4, 7) != nullptr && b.getPiece(4, 7)->getType() == Queen && "Queen should still be at (4,7)");
-    std::cout << "PASS: test_highest_does_not_mutate_board\n";
-}
-
-// After getHighestNextScore(), movePiece should still work normally
-void test_highest_then_move_still_works()
-{
-    Student::ChessBoard b(8, 8);
-    b.createChessPiece(White, Rook,  0, 0);
-    b.createChessPiece(Black, Queen, 0, 7);
-
-    b.getHighestNextScore();
-    bool ok = b.movePiece(0, 0, 0, 7); // white rook captures black queen
-    assert(ok && "movePiece should still work after getHighestNextScore()");
-    assert(b.getPiece(0, 7)->getType() == Rook && "Rook should be at (0,7) after capture");
-    std::cout << "PASS: test_highest_then_move_still_works\n";
+    for (int fr = 0; fr < b.getNumRows(); fr++)
+        for (int fc = 0; fc < b.getNumCols(); fc++) {
+            Student::ChessPiece *p = b.getPiece(fr, fc);
+            if (!p || p->getColor() != color) continue;
+            for (int tr = 0; tr < b.getNumRows(); tr++)
+                for (int tc = 0; tc < b.getNumCols(); tc++)
+                    if (b.isValidMove(fr, fc, tr, tc))
+                        return true;
+        }
+    return false;
 }
 
 int main()
 {
-    test_score_symmetric();
-    test_score_material_advantage();
-    test_score_rook_only();
-    test_score_equal_rooks();
-    test_highest_captures_queen();
-    test_highest_better_than_current();
-    test_highest_does_not_mutate_board();
-    test_highest_then_move_still_works();
+    Student::ChessBoard board;
+    setupStandardBoard(board);
 
-    std::cout << "\nAll scoring tests passed!\n";
-    return EXIT_SUCCESS;
+    Color currentTurn = White;
+
+    std::cout << "\n=== Chess ===\n";
+    std::cout << "Row 0 = Black's back rank   Row 7 = White's back rank\n";
+    std::cout << "Enter moves as:  fromRow fromCol toRow toCol\n";
+    std::cout << "Example:         6 4 4 4   (White pawn e2-e4)\n";
+    std::cout << "Type 'quit' to exit\n\n";
+
+    while (true) {
+        std::cout << board.displayBoard().str();
+        std::cout << (currentTurn == White ? "White" : "Black") << "'s turn > ";
+        std::cout.flush();
+
+        std::string line;
+        if (!std::getline(std::cin, line)) break;
+        if (line == "quit" || line == "q") {
+            std::cout << "Goodbye!\n";
+            break;
+        }
+
+        int fr, fc, tr, tc;
+        if (std::sscanf(line.c_str(), "%d %d %d %d", &fr, &fc, &tr, &tc) != 4) {
+            std::cout << "Bad input. Format: fromRow fromCol toRow toCol  (e.g. 6 4 4 4)\n\n";
+            continue;
+        }
+
+        if (!board.movePiece(fr, fc, tr, tc)) {
+            std::cout << "Invalid move — try again.\n\n";
+            continue;
+        }
+
+        currentTurn = (currentTurn == White) ? Black : White;
+
+        if (isInCheck(board, currentTurn)) {
+            if (!hasAnyLegalMove(board, currentTurn)) {
+                std::cout << board.displayBoard().str();
+                std::cout << "Checkmate! "
+                          << (currentTurn == White ? "Black" : "White")
+                          << " wins!\n";
+                break;
+            }
+            std::cout << (currentTurn == White ? "White" : "Black") << " is in check!\n\n";
+        } else if (!hasAnyLegalMove(board, currentTurn)) {
+            std::cout << board.displayBoard().str();
+            std::cout << "Stalemate — it's a draw!\n";
+            break;
+        }
+    }
+
+    return 0;
 }
